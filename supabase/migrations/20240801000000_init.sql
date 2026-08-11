@@ -22,20 +22,6 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
--- helper function to check game access (avoids RLS recursion)
-create or replace function public.can_access_game(p_game_id uuid)
-returns boolean
-language sql security definer stable set search_path = ''
-as $$
-  select exists (
-    select 1 from public.games g
-    where g.id = p_game_id and g.owner_id = auth.uid()
-  ) or exists (
-    select 1 from public.game_players gp
-    where gp.game_id = p_game_id and gp.profile_id = auth.uid()
-  );
-$$;
-
 -- games
 create table public.games (
   id uuid primary key default gen_random_uuid(),
@@ -93,3 +79,21 @@ create index on public.rounds (game_id);
 create index on public.scores (round_id);
 create index on public.scores (game_player_id);
 create index on public.friendships (friend_id);
+
+-- helper function to check game access (avoids RLS recursion); define after
+-- referenced tables because language sql bodies are resolved at creation time
+create or replace function public.can_access_game(p_game_id uuid)
+returns boolean
+language sql security definer stable set search_path = ''
+as $$
+  select exists (
+    select 1 from public.games g
+    where g.id = p_game_id and g.owner_id = auth.uid()
+  ) or exists (
+    select 1 from public.game_players gp
+    where gp.game_id = p_game_id and gp.profile_id = auth.uid()
+  );
+$$;
+
+revoke execute on function public.can_access_game(uuid) from public, anon;
+grant execute on function public.can_access_game(uuid) to authenticated;
