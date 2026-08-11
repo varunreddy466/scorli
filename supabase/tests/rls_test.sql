@@ -13,14 +13,14 @@ begin
 
   -- User A creates a game
   set local role authenticated;
-  set local request.jwt.claim.sub = user_a::text;
+  perform set_config('request.jwt.claim.sub', user_a::text, true);
+  game_a := gen_random_uuid();
 
   insert into public.games (id, owner_id, game_type_slug, status)
-  values (gen_random_uuid(), user_a, 'skyjo', 'in_progress')
-  returning id into game_a;
+  values (game_a, user_a, 'skyjo', 'in_progress');
 
   -- Assert user B cannot see user A's game
-  set local request.jwt.claim.sub = user_b::text;
+  perform set_config('request.jwt.claim.sub', user_b::text, true);
   assert not exists (
     select 1 from public.games where id = game_a
   ), 'User B should not see User A game';
@@ -48,5 +48,21 @@ begin
   ), 'Anonymous clients must not be able to read profiles';
 
   raise notice 'Anon profiles RLS test passed';
+end;
+$$;
+
+-- Anon clients must not be able to call security definer helpers directly
+do $$
+begin
+  set local role anon;
+
+  begin
+    perform public.can_access_game(gen_random_uuid());
+    assert false, 'Anonymous clients must not be able to execute can_access_game';
+  exception when insufficient_privilege then
+    -- expected
+  end;
+
+  raise notice 'Anon helper execute test passed';
 end;
 $$;
