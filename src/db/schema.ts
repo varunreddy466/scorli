@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text, real } from 'drizzle-orm/sqlite-core';
+import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 export const gameTypes = sqliteTable('game_types', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -20,6 +20,11 @@ export const games = sqliteTable('games', {
     .notNull()
     .$defaultFn(() => new Date()),
   endedAt: integer('ended_at', { mode: 'timestamp' }),
+  updatedAt: integer('updated_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  deletedAt: integer('deleted_at', { mode: 'timestamp' }),
+  cloudId: text('cloud_id'),
 });
 
 export const gamePlayers = sqliteTable('game_players', {
@@ -31,6 +36,11 @@ export const gamePlayers = sqliteTable('game_players', {
   displayName: text('display_name').notNull(),
   seatOrder: integer('seat_order').notNull(),
   color: text('color').notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  deletedAt: integer('deleted_at', { mode: 'timestamp' }),
+  cloudId: text('cloud_id'),
 });
 
 export const rounds = sqliteTable('rounds', {
@@ -42,6 +52,11 @@ export const rounds = sqliteTable('rounds', {
   createdAt: integer('created_at', { mode: 'timestamp' })
     .notNull()
     .$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  deletedAt: integer('deleted_at', { mode: 'timestamp' }),
+  cloudId: text('cloud_id'),
 });
 
 export const scores = sqliteTable('scores', {
@@ -54,6 +69,22 @@ export const scores = sqliteTable('scores', {
     .references(() => gamePlayers.id),
   points: real('points').notNull(),
   modifiers: text('modifiers', { mode: 'json' }).$type<Record<string, unknown>>(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  deletedAt: integer('deleted_at', { mode: 'timestamp' }),
+  cloudId: text('cloud_id'),
+});
+
+export const syncQueue = sqliteTable('sync_queue', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  tableName: text('table_name').notNull(),
+  localId: integer('local_id').notNull(),
+  operation: text('operation', { enum: ['insert', 'update', 'delete'] }).notNull(),
+  payload: text('payload', { mode: 'json' }).$type<Record<string, unknown>>(),
+  createdAt: integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
 });
 
 export type GameType = typeof gameTypes.$inferSelect;
@@ -61,7 +92,9 @@ export type Game = typeof games.$inferSelect;
 export type GamePlayer = typeof gamePlayers.$inferSelect;
 export type Round = typeof rounds.$inferSelect;
 export type Score = typeof scores.$inferSelect;
+export type SyncQueueRecord = typeof syncQueue.$inferSelect;
 export type NewGame = typeof games.$inferInsert;
 export type NewGamePlayer = typeof gamePlayers.$inferInsert;
 export type NewRound = typeof rounds.$inferInsert;
 export type NewScore = typeof scores.$inferInsert;
+export type NewSyncQueueRecord = typeof syncQueue.$inferInsert;
