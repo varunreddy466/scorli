@@ -4,10 +4,8 @@
     "slug": "scorli",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#1e293b"
     },
@@ -21,7 +19,6 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1e293b"
       },
       "package": "com.scorli.app"
@@ -31,15 +28,9 @@
     },
     "plugins": [
       "expo-router",
-      [
-        "expo-sqlite",
-        {
-          "enableFTS": true,
-          "useSQLCipher": false
-        }
-      ],
       "expo-apple-authentication",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-web-browser"
     ],
     "scheme": "scorli",
     "experiments": {
