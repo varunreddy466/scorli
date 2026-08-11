@@ -7,7 +7,9 @@ const FALLBACK_SUPABASE_ANON_KEY = 'placeholder-anon-key';
 
 async function getChunkCount(key: string): Promise<number> {
   const count = await SecureStore.getItemAsync(`${key}_count`);
-  return count ? Number.parseInt(count, 10) : 0;
+  if (!count) return 0;
+  const parsed = Number.parseInt(count, 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
 }
 
 async function clearChunkedValue(key: string): Promise<void> {

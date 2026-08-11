@@ -37,3 +37,16 @@ begin
   raise notice 'RLS isolation tests passed';
 end;
 $$;
+
+-- Anon access test: anonymous clients must not be able to read profiles
+do $$
+begin
+  set local role anon;
+
+  assert not exists (
+    select 1 from public.profiles limit 1
+  ), 'Anonymous clients must not be able to read profiles';
+
+  raise notice 'Anon profiles RLS test passed';
+end;
+$$;

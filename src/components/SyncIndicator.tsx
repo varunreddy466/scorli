@@ -1,8 +1,11 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { useSyncStatus } from '@/sync';
 import type { SyncStatus } from '@/sync';
+import { isSupabaseConfigured } from '@/lib/supabase';
+import { useAuthStore } from '@/store/authStore';
 
-const STATUS_CONFIG: Record<SyncStatus, { label: string; color: string }> = {
+const STATUS_CONFIG: Record<SyncStatus | 'local-only', { label: string; color: string } | null> = {
+  'local-only': null,
   idle: { label: '✓ Synced', color: '#22c55e' },
   syncing: { label: '↻ Syncing', color: '#f59e0b' },
   offline: { label: '⊘ Offline', color: '#94a3b8' },
@@ -11,7 +14,16 @@ const STATUS_CONFIG: Record<SyncStatus, { label: string; color: string }> = {
 
 export function SyncIndicator() {
   const status = useSyncStatus();
-  const config = STATUS_CONFIG[status];
+  const session = useAuthStore((state) => state.session);
+
+  if (!isSupabaseConfigured || !session) {
+    return null;
+  }
+
+  const config = STATUS_CONFIG[status] ?? STATUS_CONFIG['idle'];
+  if (!config) {
+    return null;
+  }
 
   return (
     <View style={styles.container}>

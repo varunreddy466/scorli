@@ -18,6 +18,19 @@ async function ensureColumn(
   const exists = columns.some((column) => column.name === columnName);
   if (!exists) {
     await expo.execAsync(`ALTER TABLE ${tableName} ADD COLUMN ${definition};`);
+    // Backfill updated_at: use created_at when available, otherwise the current timestamp.
+    if (columnName === 'updated_at') {
+      const hasCols = await expo.getAllAsync<TableColumn>(`PRAGMA table_info(${tableName});`);
+      const hasCreatedAt = hasCols.some((c) => c.name === 'created_at');
+      const now = Date.now();
+      if (hasCreatedAt) {
+        await expo.execAsync(
+          `UPDATE ${tableName} SET updated_at = COALESCE(created_at, ${now}) WHERE updated_at = 0;`,
+        );
+      } else {
+        await expo.execAsync(`UPDATE ${tableName} SET updated_at = ${now} WHERE updated_at = 0;`);
+      }
+    }
   }
 }
 

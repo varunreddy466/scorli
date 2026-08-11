@@ -8,7 +8,7 @@ alter table public.friendships enable row level security;
 
 -- profiles policies
 create policy "profiles_select_all" on public.profiles
-  for select using (true);
+  for select to authenticated using (true);
 
 create policy "profiles_update_own" on public.profiles
   for update using (id = auth.uid());

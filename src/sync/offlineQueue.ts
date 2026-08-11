@@ -6,7 +6,7 @@ export async function enqueue(
   tableName: string,
   localId: number,
   operation: 'insert' | 'update' | 'delete',
-  payload: Record<string, unknown>,
+  payload: Record<string, unknown> | null,
 ): Promise<void> {
   await db.insert(syncQueue).values({
     tableName,
