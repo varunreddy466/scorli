@@ -10,6 +10,8 @@ jobs:
   ci:
     name: Typecheck, Lint & Test
     runs-on: ubuntu-latest
+    env:
+      CI: 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -29,4 +31,4 @@ jobs:
         run: npm run lint
 
       - name: Test
-        run: npm test
+        run: npm test -- --runInBand

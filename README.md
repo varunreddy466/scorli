@@ -10,7 +10,12 @@ A cross-platform (iOS + Android) card game scorekeeping app built with Expo, Rea
 - Skyjo doubling penalty automatically applied when closer isn't strictly lowest
 - Undo last round, edit any score
 - Full offline persistence via SQLite (expo-sqlite + Drizzle ORM)
+- Optional Supabase accounts, cloud backup, and sync
 - Game history with final standings
+
+## Offline-first by default
+
+Scorli remains fully usable with no account and no network connection. Supabase auth and sync are additive: local games continue to work even when cloud features are not configured.
 
 ## Setup
 
@@ -25,6 +30,16 @@ A cross-platform (iOS + Android) card game scorekeeping app built with Expo, Rea
 ```bash
 npm install
 ```
+
+### Optional Supabase setup
+
+1. Copy `.env.example` to `.env.local`.
+2. Fill in `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
+3. Apply the SQL in `supabase/migrations/` to your Supabase project.
+4. Deploy the Edge Function in `supabase/functions/delete-account`.
+5. Run the RLS assertions in `supabase/tests/rls_test.sql` after resetting your local Supabase DB.
+
+If you skip these steps, Scorli still works locally with offline storage only.
 
 ### Start the development server
 
@@ -69,7 +84,7 @@ npm run lint
      skyjo,
      rummy,
      custom,
-     mygame: myGame,  // add here
+     mygame: myGame,
    };
    ```
 4. The new game type will appear automatically in the "New Game" screen.
@@ -108,8 +123,10 @@ Update `eas.json` with your Apple ID, ASC App ID, Apple Team ID, and Google serv
 
 ```bash
 npm run db:generate   # generate migration files from schema
-npm run db:migrate    # apply migrations
+npm run db:migrate    # apply local SQLite migrations
 ```
+
+Supabase SQL migrations live under `supabase/migrations/`.
 
 ## Tech Stack
 
@@ -121,6 +138,7 @@ npm run db:migrate    # apply migrations
 | Styling | NativeWind v4 (Tailwind) |
 | State | Zustand |
 | Database | expo-sqlite + Drizzle ORM |
+| Cloud | Supabase Auth + Edge Functions |
 | Testing | Jest + @testing-library/react-native |
 | Linting | ESLint (eslint-config-expo) + Prettier |
 | CI/CD | GitHub Actions + EAS |

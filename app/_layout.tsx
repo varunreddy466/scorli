@@ -1,15 +1,42 @@
 import '../global.css';
 import { Stack } from 'expo-router';
 import { useEffect } from 'react';
-import { useGameStore } from '@/store/gameStore';
 import { StatusBar } from 'expo-status-bar';
+import { SyncIndicator } from '@/components/SyncIndicator';
+import { initSync } from '@/sync';
+import { useGameStore } from '@/store/gameStore';
+import { useAuthStore } from '@/store/authStore';
 
 export default function RootLayout() {
-  const init = useGameStore((s) => s.init);
+  const initGameStore = useGameStore((state) => state.init);
 
   useEffect(() => {
-    void init();
-  }, [init]);
+    void initGameStore();
+  }, [initGameStore]);
+
+  useEffect(() => {
+    let active = true;
+    let unsubscribeAuth = () => {};
+
+    void useAuthStore
+      .getState()
+      .init()
+      .then((cleanup) => {
+        if (!active) {
+          cleanup();
+          return;
+        }
+        unsubscribeAuth = cleanup;
+      });
+
+    const unsubscribeSync = initSync();
+
+    return () => {
+      active = false;
+      unsubscribeAuth();
+      unsubscribeSync();
+    };
+  }, []);
 
   return (
     <>
@@ -20,6 +47,7 @@ export default function RootLayout() {
           headerTintColor: '#f8fafc',
           headerTitleStyle: { fontWeight: 'bold' },
           contentStyle: { backgroundColor: '#0f172a' },
+          headerRight: () => <SyncIndicator />,
         }}
       >
         <Stack.Screen name="index" options={{ title: 'Scorli' }} />
@@ -30,6 +58,9 @@ export default function RootLayout() {
           options={{ title: 'Add Round', presentation: 'modal' }}
         />
         <Stack.Screen name="history" options={{ title: 'History' }} />
+        <Stack.Screen name="(auth)/sign-in" options={{ title: 'Sign In' }} />
+        <Stack.Screen name="profile" options={{ title: 'Profile' }} />
+        <Stack.Screen name="friends" options={{ title: 'Friends' }} />
       </Stack>
     </>
   );

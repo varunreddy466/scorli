@@ -11,10 +11,13 @@
       "resizeMode": "contain",
       "backgroundColor": "#1e293b"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.scorli.app"
+      "bundleIdentifier": "com.scorli.app",
+      "usesAppleSignIn": true
     },
     "android": {
       "adaptiveIcon": {
@@ -34,7 +37,9 @@
           "enableFTS": true,
           "useSQLCipher": false
         }
-      ]
+      ],
+      "expo-apple-authentication",
+      "expo-secure-store"
     ],
     "scheme": "scorli",
     "experiments": {
