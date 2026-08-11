@@ -3,7 +3,7 @@ import { Stack } from 'expo-router';
 import { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SyncIndicator } from '@/components/SyncIndicator';
-import { initSync } from '@/sync';
+import { initSync, runSync } from '@/sync';
 import { useGameStore } from '@/store/gameStore';
 import { useAuthStore } from '@/store/authStore';
 
@@ -27,6 +27,7 @@ export default function RootLayout() {
           return;
         }
         unsubscribeAuth = cleanup;
+        void runSync();
       });
 
     const unsubscribeSync = initSync();

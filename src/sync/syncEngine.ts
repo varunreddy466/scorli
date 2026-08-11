@@ -48,26 +48,35 @@ export async function runSync(): Promise<void> {
   setStatus('syncing');
   try {
     const pending = await getPendingOperations();
+    let anyFailed = false;
     for (const op of pending) {
       try {
+        let opError: { message: string } | null = null;
         if (op.operation === 'insert' || op.operation === 'update') {
-          await supabase.from(op.tableName).upsert(op.payload ?? {});
+          const { error } = await supabase.from(op.tableName).upsert(op.payload ?? {});
+          opError = error;
         } else {
           const cloudId = getDeleteCloudId(op.payload);
           if (!cloudId) {
             continue;
           }
-          await supabase
+          const { error } = await supabase
             .from(op.tableName)
             .update({ deleted_at: new Date().toISOString() })
             .eq('id', cloudId);
+          opError = error;
         }
-        await removeFromQueue(op.id);
+        if (opError) {
+          anyFailed = true;
+        } else {
+          await removeFromQueue(op.id);
+        }
       } catch {
         // Leave failed entries queued for a future retry.
+        anyFailed = true;
       }
     }
-    setStatus('idle');
+    setStatus(anyFailed ? 'error' : 'idle');
   } catch {
     setStatus('error');
   }
