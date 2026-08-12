@@ -2,6 +2,12 @@
 
 A cross-platform (iOS + Android) card game scorekeeping app built with Expo, React Native, and TypeScript.
 
+## Architecture
+
+For a full description of the system context, layer decomposition, runtime flows, local schema,
+sync subsystem, cloud authorization model, and known gaps, see
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 ## Features
 
 - Track scores for **Skyjo**, **Rummy**, and **Custom** card games
