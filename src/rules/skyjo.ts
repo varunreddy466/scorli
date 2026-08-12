@@ -57,6 +57,7 @@ export const skyjo: GameRules = {
   maxPlayers: 8,
   description: 'Lowest total after someone hits 100',
   icon: 'layers-outline',
+  usesCloser: true,
   scoreRound,
   isGameOver,
   rank,

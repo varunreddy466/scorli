@@ -43,6 +43,7 @@ export const custom: GameRules = {
   maxPlayers: 8,
   description: 'Custom scoring rules',
   icon: 'settings-outline',
+  defaultConfig: {},
   scoreRound,
   isGameOver,
   rank(totals: PlayerTotals[]): RankedPlayer[] {

@@ -2,8 +2,20 @@ import { desc, eq } from 'drizzle-orm';
 import { create } from 'zustand';
 import { db, initDB } from '@/db/client';
 import { gamePlayers, games, gameTypes, rounds, scores } from '@/db/schema';
-import type { Game, NewGame, NewGamePlayer } from '@/db/schema';
-import { getGameRules } from '@/rules';
+import type { Game, GameType, NewGame, NewGamePlayer } from '@/db/schema';
+import { getAllGameTypes, getGameRules } from '@/rules';
+
+/**
+ * Merges a game-type's default config with a per-game targetScore override.
+ * Use this consistently wherever config is passed to rules functions.
+ */
+export function resolveGameConfig(
+  gameType: Pick<GameType, 'config'>,
+  game: { targetScore?: number | null },
+): Record<string, unknown> {
+  const base = (gameType.config as Record<string, unknown>) ?? {};
+  return game.targetScore != null ? { ...base, targetScore: game.targetScore } : base;
+}
 
 interface GameState {
   initialized: boolean;
@@ -26,6 +38,49 @@ interface GameState {
   loadGames: () => Promise<void>;
 }
 
+/** Recompute totals for all players in a game and mark completed if rules say so. */
+async function recomputeAndSettle(gameId: number): Promise<void> {
+  const [joined] = await db
+    .select({
+      slug: gameTypes.slug,
+      config: gameTypes.config,
+      targetScore: games.targetScore,
+    })
+    .from(games)
+    .innerJoin(gameTypes, eq(games.gameTypeId, gameTypes.id))
+    .where(eq(games.id, gameId));
+
+  if (!joined) return;
+
+  const rules = getGameRules(joined.slug);
+  const config = resolveGameConfig(joined, joined);
+
+  const playerRows = await db.select().from(gamePlayers).where(eq(gamePlayers.gameId, gameId));
+  const allScores = await db
+    .select()
+    .from(scores)
+    .innerJoin(rounds, eq(scores.roundId, rounds.id))
+    .where(eq(rounds.gameId, gameId));
+
+  const totals = playerRows.map((player) => ({
+    gamePlayerId: player.id,
+    displayName: player.displayName,
+    total: allScores
+      .filter((s) => s.scores.gamePlayerId === player.id)
+      .reduce((sum, s) => sum + s.scores.points, 0),
+  }));
+
+  const now = new Date();
+  if (rules.isGameOver(totals, config)) {
+    await db
+      .update(games)
+      .set({ status: 'completed', endedAt: now, updatedAt: now })
+      .where(eq(games.id, gameId));
+  } else {
+    await db.update(games).set({ updatedAt: now }).where(eq(games.id, gameId));
+  }
+}
+
 export const useGameStore = create<GameState>((set, get) => ({
   initialized: false,
   activeGames: [],
@@ -33,13 +88,19 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   init: async () => {
     await initDB();
+    const allRules = getAllGameTypes();
     await db
       .insert(gameTypes)
-      .values([
-        { slug: 'skyjo', name: 'Skyjo', config: { targetScore: 100 } },
-        { slug: 'rummy', name: 'Rummy', config: { eliminationThreshold: 200 } },
-        { slug: 'custom', name: 'Custom', config: {} },
-      ])
+      .values(
+        allRules.map((rule) => ({
+          slug: rule.slug,
+          name: rule.name,
+          config:
+            rule.defaultConfig !== undefined
+              ? rule.defaultConfig
+              : { targetScore: rule.defaultTargetScore, winCondition: rule.winCondition },
+        })),
+      )
       .onConflictDoNothing();
     await get().loadGames();
     set({ initialized: true });
@@ -92,7 +153,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   addRound: async ({ gameId, scores: scoreMap, closerId }) => {
     const [joined] = await db
-      .select({ slug: gameTypes.slug, config: gameTypes.config })
+      .select({ slug: gameTypes.slug, config: gameTypes.config, targetScore: games.targetScore })
       .from(games)
       .innerJoin(gameTypes, eq(games.gameTypeId, gameTypes.id))
       .where(eq(games.id, gameId));
@@ -115,7 +176,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       })
       .returning();
 
-    const config = (joined.config as Record<string, unknown>) ?? {};
+    const config = resolveGameConfig(joined, joined);
     const result = rules.scoreRound({
       scores: scoreMap,
       closerId,
@@ -131,31 +192,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     }));
     await db.insert(scores).values(scoreRows);
 
-    const players = await db.select().from(gamePlayers).where(eq(gamePlayers.gameId, gameId));
-    const allScores = await db
-      .select()
-      .from(scores)
-      .innerJoin(rounds, eq(scores.roundId, rounds.id))
-      .where(eq(rounds.gameId, gameId));
-
-    const totals = players.map((player) => ({
-      gamePlayerId: player.id,
-      displayName: player.displayName,
-      total: allScores
-        .filter((scoreRow) => scoreRow.scores.gamePlayerId === player.id)
-        .reduce((sum, scoreRow) => sum + scoreRow.scores.points, 0),
-    }));
-
-    const gameOver = rules.isGameOver(totals, config);
-    if (gameOver) {
-      await db
-        .update(games)
-        .set({ status: 'completed', endedAt: now, updatedAt: now })
-        .where(eq(games.id, gameId));
-    } else {
-      await db.update(games).set({ updatedAt: now }).where(eq(games.id, gameId));
-    }
-
+    await recomputeAndSettle(gameId);
     await get().loadGames();
   },
 
@@ -179,6 +216,17 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   updateScore: async (scoreId, points) => {
     await db.update(scores).set({ points, updatedAt: new Date() }).where(eq(scores.id, scoreId));
+
+    const [scoreRow] = await db
+      .select({ gameId: rounds.gameId })
+      .from(scores)
+      .innerJoin(rounds, eq(scores.roundId, rounds.id))
+      .where(eq(scores.id, scoreId));
+
+    if (scoreRow) {
+      await recomputeAndSettle(scoreRow.gameId);
+    }
+
     await get().loadGames();
   },
 

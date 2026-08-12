@@ -5,6 +5,7 @@ import { db } from '@/db/client';
 import { games, gamePlayers, rounds, scores, gameTypes } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { useGameStore } from '@/store/gameStore';
+import { resolveGameConfig } from '@/store/gameStore';
 import { getGameRules } from '@/rules';
 import type { GamePlayer, Round, Score, Game, GameType } from '@/db/schema';
 
@@ -18,6 +19,7 @@ export default function GameScreen() {
   const router = useRouter();
   const deleteLastRound = useGameStore((s) => s.deleteLastRound);
   const finishGame = useGameStore((s) => s.finishGame);
+  const updateScore = useGameStore((s) => s.updateScore);
 
   const [game, setGame] = useState<Game | null>(null);
   const [gameType, setGameType] = useState<GameType | null>(null);
@@ -93,7 +95,7 @@ export default function GameScreen() {
   }));
 
   const ranked = rules.rank(totals);
-  const config = (gameType.config as Record<string, unknown>) ?? {};
+  const config = resolveGameConfig(gameType, game);
   const gameOver = game.status === 'completed' || rules.isGameOver(totals, config);
 
   const handleDeleteLast = () => {
@@ -163,7 +165,19 @@ export default function GameScreen() {
                     key={p.id}
                     className="w-20 items-center py-3"
                     onPress={() => {
-                      // TODO: edit score
+                      if (!s) return;
+                      Alert.prompt(
+                        'Edit Score',
+                        `New score for ${p.displayName} in round ${row.round.roundNumber}:`,
+                        (text) => {
+                          const parsed = Number(text);
+                          if (!text || isNaN(parsed)) return;
+                          void updateScore(s.id, parsed).then(() => loadData());
+                        },
+                        'plain-text',
+                        String(s.points),
+                        'numeric',
+                      );
                     }}
                   >
                     <Text className="text-sm text-white">{s ? s.points : '–'}</Text>

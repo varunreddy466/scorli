@@ -67,6 +67,7 @@ useGameStore.init()
        └─ CREATE TABLE IF NOT EXISTS … (all tables)
        └─ ensureColumn() patches (updated_at, deleted_at, cloud_id)
        └─ seed game_types via onConflictDoNothing
+              (derived from getAllGameTypes() registry — all 9 slugs)
   └─ loadGames()
 
 useAuthStore.init()
@@ -87,14 +88,17 @@ cleanup
 ```
 Screen /game/[id]/round
   → addRound({ gameId, scores, closerId })
-       → JOIN games × game_types → slug + config
-       → getGameRules(slug).scoreRound({ scores, closerId, config })
+       → JOIN games × game_types → slug + config + targetScore
+       → resolveGameConfig(gameType, game)
+            → { ...gameType.config, ...(game.targetScore != null ? { targetScore } : {}) }
+       → getGameRules(slug).scoreRound({ scores, closerId, config: effectiveConfig })
        → INSERT rounds  (roundNumber = existing.length + 1)
        → INSERT scores  (points + modifiers JSON per player)
-       → recompute totals from all scores for this game
-       → rules.isGameOver(totals, config)
-            true  → UPDATE games SET status = 'completed', ended_at = now
-            false → UPDATE games SET updated_at = now
+       → recomputeAndSettle(gameId)
+            → recompute totals from all scores for this game
+            → rules.isGameOver(totals, effectiveConfig)
+                 true  → UPDATE games SET status = 'completed', ended_at = now
+                 false → UPDATE games SET updated_at = now
        → loadGames()  ← triggers Zustand re-render
 ```
 
@@ -136,6 +140,10 @@ export interface GameRules {
   maxPlayers: number;
   description?: string;
   icon?: string;
+  /** Override the auto-built seed config (used for rummy's eliminationThreshold). */
+  defaultConfig?: GameConfig;
+  /** True for rulesets that use the "closer" mechanic (Skyjo). Drives the UI toggle. */
+  usesCloser?: boolean;
   scoreRound(input: RoundInput): RoundResult;
   isGameOver(totals: PlayerTotals[], config: GameConfig): boolean;
   rank(totals: PlayerTotals[]): RankedPlayer[];
@@ -249,6 +257,14 @@ interface GameState {
   `completedGames`.
 - `createGame` resolves the slug → `game_types` row, inserts with `.returning()` to obtain
   the new id, then bulk-inserts players with `seatOrder = index`.
+- `addRound` joins `games × game_types` and selects `games.targetScore` to build the
+  *effective config* via `resolveGameConfig(gameType, game)` — a per-game `targetScore`
+  overrides the seeded default. This is then passed to both `scoreRound` and `isGameOver`.
+- `updateScore` mutates the score row and calls the shared `recomputeAndSettle` helper (same
+  logic as `addRound`) so game-over is re-evaluated after an edit.
+- `resolveGameConfig(gameType, game)` is exported from `gameStore.ts` and consumed by
+  `app/game/[id].tsx` and `app/game/[id]/round.tsx` so config resolution cannot drift across
+  call sites.
 - `deleteLastRound` orders rounds `DESC` by `roundNumber`, hard-deletes the associated
   scores rows first, then the round row, and bumps `games.updatedAt`.
 - Every mutator ends with `await get().loadGames()` as the invalidation mechanism — there is
@@ -344,5 +360,6 @@ limits.
 | 2 | Nothing in the app currently calls `enqueue()`. `gameStore` mutations write to SQLite but never populate `sync_queue`, so `runSync()` drains an always-empty outbox. `resolveConflict()` is also unused; there is no pull/download path — sync is push-only. | `src/store/gameStore.ts`, `src/sync/offlineQueue.ts`, `src/sync/conflictResolution.ts` |
 | 3 | `cloud_id` is never populated locally, so any queued delete would always hit the `!cloudId → continue` branch in `runSync()` and be silently skipped. | `src/sync/syncEngine.ts` |
 | 4 | Local ids are auto-increment integers; cloud ids are UUIDs. There is no id-mapping layer, so upsert payloads would require one before the sync path can work end-to-end. | `src/db/schema.ts`, `supabase/migrations/20240801000000_init.sql` |
-| 5 | `gameStore.updateScore` does not recompute game-over the way `addRound` does. `app/game/[id].tsx` still has a `// TODO: edit score` comment on the score cell, so `updateScore` currently has no UI caller. | `src/store/gameStore.ts`, `app/game/[id].tsx` |
-| 6 | A `.env` file is committed at the repository root. Verify it contains no real Supabase anon key or URL and add it to `.gitignore`. | `.env` |
+| 5 | A `.env` file is committed at the repository root. Verify it contains no real Supabase anon key or URL and add it to `.gitignore`. | `.env` |
+
+> **Fixed in this PR (local persistence):** `game_types` seeding now derives from `getAllGameTypes()` so all 9 slugs are always present; `new-game.tsx` reads the `?type=` query param; `resolveGameConfig` merges per-game `targetScore` into the effective config for `addRound`, `updateScore`, and the round-entry preview; `updateScore` calls `recomputeAndSettle` so game-over is re-evaluated after an edit; and the round-entry preview uses the actual game slug and effective config.
