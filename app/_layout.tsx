@@ -1,11 +1,23 @@
 import '../global.css';
 import { Stack } from 'expo-router';
 import { useEffect } from 'react';
+import { Pressable } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { SyncIndicator } from '@/components/SyncIndicator';
 import { initSync, runSync } from '@/sync';
 import { useGameStore } from '@/store/gameStore';
 import { useAuthStore } from '@/store/authStore';
+
+function ProfileHeaderButton() {
+  const router = useRouter();
+  return (
+    <Pressable onPress={() => router.push('/profile')} style={{ marginLeft: 12 }}>
+      <Ionicons name="person-circle-outline" size={26} color="#f8fafc" />
+    </Pressable>
+  );
+}
 
 export default function RootLayout() {
   const initGameStore = useGameStore((state) => state.init);
@@ -51,7 +63,10 @@ export default function RootLayout() {
           headerRight: () => <SyncIndicator />,
         }}
       >
-        <Stack.Screen name="index" options={{ title: 'Scorli' }} />
+        <Stack.Screen
+          name="index"
+          options={{ title: 'Scorli', headerLeft: () => <ProfileHeaderButton /> }}
+        />
         <Stack.Screen name="new-game" options={{ title: 'New Game' }} />
         <Stack.Screen name="game/[id]" options={{ title: 'Game' }} />
         <Stack.Screen

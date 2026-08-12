@@ -14,25 +14,24 @@ function scoreRound(input: RoundInput): RoundResult {
 }
 
 function isGameOver(totals: PlayerTotals[], config: GameConfig): boolean {
-  const threshold =
-    typeof config.eliminationThreshold === 'number' ? config.eliminationThreshold : 200;
+  const threshold = typeof config.targetScore === 'number' ? config.targetScore : 121;
   return totals.some((p) => p.total >= threshold);
 }
 
 function rank(totals: PlayerTotals[]): RankedPlayer[] {
-  const sorted = [...totals].sort((a, b) => a.total - b.total);
+  const sorted = [...totals].sort((a, b) => b.total - a.total);
   return sorted.map((p, i) => ({ ...p, rank: i + 1 }));
 }
 
-export const rummy: GameRules = {
-  slug: 'rummy',
-  name: 'Rummy',
-  defaultTargetScore: 200,
-  winCondition: 'lowest',
+export const cribbage: GameRules = {
+  slug: 'cribbage',
+  name: 'Cribbage',
+  defaultTargetScore: 121,
+  winCondition: 'highest',
   minPlayers: 2,
-  maxPlayers: 6,
-  description: 'Lowest penalty total after someone hits 200',
-  icon: 'card-outline',
+  maxPlayers: 4,
+  description: 'Race to 121 pegging points',
+  icon: 'stats-chart-outline',
   scoreRound,
   isGameOver,
   rank,

@@ -1,7 +1,13 @@
+export interface SpadesBidEntry {
+  bid: number;
+  tricks: number;
+}
+
 export interface RoundInput {
   scores: Record<number, number>;
   closerId?: number;
   config: GameConfig;
+  entries?: Record<number, SpadesBidEntry>;
 }
 
 export interface RoundResult {
@@ -34,6 +40,8 @@ export interface GameRules {
   winCondition: 'lowest' | 'highest';
   minPlayers: number;
   maxPlayers: number;
+  description?: string;
+  icon?: string;
   scoreRound(input: RoundInput): RoundResult;
   isGameOver(totals: PlayerTotals[], config: GameConfig): boolean;
   rank(totals: PlayerTotals[]): RankedPlayer[];
