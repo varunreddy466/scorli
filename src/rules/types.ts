@@ -42,6 +42,10 @@ export interface GameRules {
   maxPlayers: number;
   description?: string;
   icon?: string;
+  /** Extra config keys beyond targetScore/winCondition (e.g. eliminationThreshold). */
+  defaultConfig?: GameConfig;
+  /** Whether this ruleset uses a "closer" concept (e.g. Skyjo). */
+  usesCloser?: boolean;
   scoreRound(input: RoundInput): RoundResult;
   isGameOver(totals: PlayerTotals[], config: GameConfig): boolean;
   rank(totals: PlayerTotals[]): RankedPlayer[];

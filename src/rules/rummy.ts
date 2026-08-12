@@ -33,6 +33,7 @@ export const rummy: GameRules = {
   maxPlayers: 6,
   description: 'Lowest penalty total after someone hits 200',
   icon: 'card-outline',
+  defaultConfig: { eliminationThreshold: 200 },
   scoreRound,
   isGameOver,
   rank,

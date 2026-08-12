@@ -1,6 +1,6 @@
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useGameStore } from '@/store/gameStore';
 import { getAllGameTypes } from '@/rules';
 
@@ -22,10 +22,14 @@ interface PlayerEntry {
 
 export default function NewGameScreen() {
   const router = useRouter();
+  const { type } = useLocalSearchParams<{ type?: string }>();
   const createGame = useGameStore((s) => s.createGame);
   const gameTypes = getAllGameTypes();
 
-  const [selectedSlug, setSelectedSlug] = useState<string>('skyjo');
+  const validSlugs = new Set(gameTypes.map((gt) => gt.slug));
+  const initialSlug = type && validSlugs.has(type) ? type : 'skyjo';
+
+  const [selectedSlug, setSelectedSlug] = useState<string>(initialSlug);
   const [targetScore, setTargetScore] = useState<string>('');
   const [players, setPlayers] = useState<PlayerEntry[]>([
     { name: '', color: COLORS[0] },
