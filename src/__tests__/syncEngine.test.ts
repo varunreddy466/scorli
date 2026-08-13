@@ -8,9 +8,18 @@ const mockUpdate = jest.fn();
 const mockEq = jest.fn();
 const mockFrom = jest.fn();
 
+jest.mock('@/sync/syncMeta', () => ({
+  getLastSyncAt: jest.fn().mockResolvedValue(null),
+  setLastSyncAt: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock('@/lib/supabase', () => ({
   supabase: {
     from: (...args: unknown[]) => mockFrom(...args),
+    rpc: jest.fn().mockResolvedValue({
+      data: { games: [], game_players: [], rounds: [], scores: [] },
+      error: null,
+    }),
   },
   isSupabaseConfigured: true,
 }));
@@ -37,6 +46,28 @@ jest.mock('@/sync/offlineQueue', () => ({
   removeFromQueue: (...args: unknown[]) => mockRemoveFromQueue(...args),
 }));
 
+jest.mock('@/sync/syncPayload', () => ({
+  buildPayloadWithCloudId: jest.fn(async (_table: string, _localId: number) => ({})),
+  buildDeletePayload: jest.fn(async (_table: string, _localId: number) => ({
+    cloudId: 'remote-id',
+  })),
+  hasCloudId: jest.fn(() => false),
+}));
+
+jest.mock('@/sync/cloudMapping', () => ({
+  setCloudId: jest.fn().mockResolvedValue(undefined),
+  setCloudFks: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('@/sync/conflictResolution', () => ({
+  resolveConflict: jest.fn(),
+}));
+
+jest.mock('@/db/client', () => ({
+  db: {},
+  initDB: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { runSync, getSyncStatus } from '@/sync/syncEngine';
 
 function makeOp(override: Partial<SyncQueueEntry> = {}): SyncQueueEntry {
@@ -59,7 +90,9 @@ describe('runSync — error path', () => {
   it('keeps failed op in queue and sets status to error when Supabase upsert fails', async () => {
     mockGetPendingOperations.mockResolvedValue([makeOp()]);
     mockFrom.mockReturnValue({ upsert: mockUpsert });
-    mockUpsert.mockResolvedValue({ error: { message: 'network error' } });
+    mockUpsert.mockReturnValue({
+      select: jest.fn().mockResolvedValue({ error: { message: 'network error' }, data: null }),
+    });
 
     await runSync();
 
@@ -70,7 +103,7 @@ describe('runSync — error path', () => {
   it('removes successful op from queue and sets status to idle', async () => {
     mockGetPendingOperations.mockResolvedValue([makeOp()]);
     mockFrom.mockReturnValue({ upsert: mockUpsert });
-    mockUpsert.mockResolvedValue({ error: null });
+    mockUpsert.mockReturnValue({ select: jest.fn().mockResolvedValue({ error: null, data: [] }) });
 
     await runSync();
 
