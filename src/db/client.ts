@@ -62,7 +62,8 @@ export async function initDB(): Promise<void> {
       color TEXT NOT NULL,
       updated_at INTEGER NOT NULL,
       deleted_at INTEGER,
-      cloud_id TEXT
+      cloud_id TEXT,
+      cloud_game_id TEXT
     );
     CREATE TABLE IF NOT EXISTS rounds (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -71,7 +72,8 @@ export async function initDB(): Promise<void> {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       deleted_at INTEGER,
-      cloud_id TEXT
+      cloud_id TEXT,
+      cloud_game_id TEXT
     );
     CREATE TABLE IF NOT EXISTS scores (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -81,7 +83,9 @@ export async function initDB(): Promise<void> {
       modifiers TEXT,
       updated_at INTEGER NOT NULL,
       deleted_at INTEGER,
-      cloud_id TEXT
+      cloud_id TEXT,
+      cloud_round_id TEXT,
+      cloud_game_player_id TEXT
     );
     CREATE TABLE IF NOT EXISTS sync_queue (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -99,10 +103,14 @@ export async function initDB(): Promise<void> {
   await ensureColumn('game_players', 'updated_at', 'updated_at INTEGER NOT NULL DEFAULT 0');
   await ensureColumn('game_players', 'deleted_at', 'deleted_at INTEGER');
   await ensureColumn('game_players', 'cloud_id', 'cloud_id TEXT');
+  await ensureColumn('game_players', 'cloud_game_id', 'cloud_game_id TEXT');
   await ensureColumn('rounds', 'updated_at', 'updated_at INTEGER NOT NULL DEFAULT 0');
   await ensureColumn('rounds', 'deleted_at', 'deleted_at INTEGER');
   await ensureColumn('rounds', 'cloud_id', 'cloud_id TEXT');
+  await ensureColumn('rounds', 'cloud_game_id', 'cloud_game_id TEXT');
   await ensureColumn('scores', 'updated_at', 'updated_at INTEGER NOT NULL DEFAULT 0');
   await ensureColumn('scores', 'deleted_at', 'deleted_at INTEGER');
   await ensureColumn('scores', 'cloud_id', 'cloud_id TEXT');
+  await ensureColumn('scores', 'cloud_round_id', 'cloud_round_id TEXT');
+  await ensureColumn('scores', 'cloud_game_player_id', 'cloud_game_player_id TEXT');
 }

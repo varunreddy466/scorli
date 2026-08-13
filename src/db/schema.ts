@@ -41,6 +41,7 @@ export const gamePlayers = sqliteTable('game_players', {
     .$defaultFn(() => new Date()),
   deletedAt: integer('deleted_at', { mode: 'timestamp' }),
   cloudId: text('cloud_id'),
+  cloudGameId: text('cloud_game_id'),
 });
 
 export const rounds = sqliteTable('rounds', {
@@ -57,6 +58,7 @@ export const rounds = sqliteTable('rounds', {
     .$defaultFn(() => new Date()),
   deletedAt: integer('deleted_at', { mode: 'timestamp' }),
   cloudId: text('cloud_id'),
+  cloudGameId: text('cloud_game_id'),
 });
 
 export const scores = sqliteTable('scores', {
@@ -74,6 +76,8 @@ export const scores = sqliteTable('scores', {
     .$defaultFn(() => new Date()),
   deletedAt: integer('deleted_at', { mode: 'timestamp' }),
   cloudId: text('cloud_id'),
+  cloudRoundId: text('cloud_round_id'),
+  cloudGamePlayerId: text('cloud_game_player_id'),
 });
 
 export const syncQueue = sqliteTable('sync_queue', {
