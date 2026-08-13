@@ -103,6 +103,10 @@ export async function initDB(): Promise<void> {
       payload TEXT,
       created_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS sync_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );
   `);
 
   await ensureColumn('games', 'updated_at', 'updated_at INTEGER NOT NULL DEFAULT 0');

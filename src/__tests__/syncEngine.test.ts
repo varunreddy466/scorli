@@ -8,10 +8,18 @@ const mockUpdate = jest.fn();
 const mockEq = jest.fn();
 const mockFrom = jest.fn();
 
+jest.mock('@/sync/syncMeta', () => ({
+  getLastSyncAt: jest.fn().mockResolvedValue(null),
+  setLastSyncAt: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock('@/lib/supabase', () => ({
   supabase: {
     from: (...args: unknown[]) => mockFrom(...args),
-    rpc: jest.fn().mockResolvedValue({ data: [], error: null }),
+    rpc: jest.fn().mockResolvedValue({
+      data: { games: [], game_players: [], rounds: [], scores: [] },
+      error: null,
+    }),
   },
   isSupabaseConfigured: true,
 }));

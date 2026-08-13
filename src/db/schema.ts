@@ -91,12 +91,18 @@ export const syncQueue = sqliteTable('sync_queue', {
     .$defaultFn(() => new Date()),
 });
 
+export const syncMeta = sqliteTable('sync_meta', {
+  key: text('key').primaryKey(),
+  value: text('value', { mode: 'json' }).$type<Record<string, unknown>>(),
+});
+
 export type GameType = typeof gameTypes.$inferSelect;
 export type Game = typeof games.$inferSelect;
 export type GamePlayer = typeof gamePlayers.$inferSelect;
 export type Round = typeof rounds.$inferSelect;
 export type Score = typeof scores.$inferSelect;
 export type SyncQueueRecord = typeof syncQueue.$inferSelect;
+export type SyncMeta = typeof syncMeta.$inferSelect;
 export type NewGame = typeof games.$inferInsert;
 export type NewGamePlayer = typeof gamePlayers.$inferInsert;
 export type NewRound = typeof rounds.$inferInsert;
