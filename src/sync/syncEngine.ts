@@ -4,7 +4,7 @@ import { useAuthStore } from '@/store/authStore';
 import { getPendingOperations, removeFromQueue } from './offlineQueue';
 import { resolveConflict } from './conflictResolution';
 import { setCloudFks, setCloudId } from './cloudMapping';
-import { buildDeletePayload, buildPayloadWithCloudId } from './syncPayload';
+import { buildDeletePayload, buildPayloadWithCloudId, hasCloudId } from './syncPayload';
 import type { SyncStatus } from './types';
 import type { SyncTableName } from './syncPayload';
 
@@ -76,6 +76,11 @@ async function pushPending(): Promise<boolean> {
           const returned = data[0] as { id: string };
           await setCloudId(op.tableName, op.localId, returned.id);
         }
+        if (!opError && !hasCloudId(payload) && data && data.length > 0) {
+          // Parent was just assigned its cloud id; ensure child payloads
+          // generated later use the new FK mapping.
+          await updateChildCloudFks(op.tableName, op.localId, data);
+        }
       } else {
         const cloudId = getDeleteCloudId(payload);
         if (!cloudId) {
@@ -141,6 +146,23 @@ interface RemoteScore {
   modifiers: Record<string, unknown> | null;
   updated_at: string;
   deleted_at: string | null;
+}
+
+async function updateChildCloudFks(
+  tableName: SyncTableName,
+  localId: number,
+  data: unknown[] | null,
+): Promise<void> {
+  if (!data || data.length === 0) return;
+  const returned = data[0] as { id: string };
+  if (tableName === 'games') {
+    await setCloudFks('game_players', localId, { cloudGameId: returned.id });
+    await setCloudFks('rounds', localId, { cloudGameId: returned.id });
+  } else if (tableName === 'game_players') {
+    await setCloudFks('scores', localId, { cloudGamePlayerId: returned.id });
+  } else if (tableName === 'rounds') {
+    await setCloudFks('scores', localId, { cloudRoundId: returned.id });
+  }
 }
 
 async function pullChanges(): Promise<boolean> {

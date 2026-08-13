@@ -43,6 +43,7 @@ jest.mock('@/sync/syncPayload', () => ({
   buildDeletePayload: jest.fn(async (_table: string, _localId: number) => ({
     cloudId: 'remote-id',
   })),
+  hasCloudId: jest.fn(() => false),
 }));
 
 jest.mock('@/sync/cloudMapping', () => ({

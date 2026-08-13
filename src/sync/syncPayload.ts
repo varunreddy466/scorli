@@ -43,6 +43,10 @@ export async function buildPayloadWithCloudId(
   return payload;
 }
 
+export function hasCloudId(payload: Record<string, unknown> | null): boolean {
+  return typeof payload?.id === 'string' && payload.id.length > 0;
+}
+
 export async function buildDeletePayload(
   tableName: SyncTableName,
   localId: number,
