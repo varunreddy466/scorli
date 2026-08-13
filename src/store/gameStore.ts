@@ -1,8 +1,9 @@
 import { desc, eq } from 'drizzle-orm';
 import { create } from 'zustand';
-import { db, initDB } from '@/db/client';
+import { db, initDB, runInTransaction } from '@/db/client';
 import { gamePlayers, games, gameTypes, rounds, scores } from '@/db/schema';
 import type { Game, GameType, NewGame, NewGamePlayer } from '@/db/schema';
+import { enqueue } from '@/sync/offlineQueue';
 import { getAllGameTypes, getGameRules } from '@/rules';
 
 /**
@@ -122,33 +123,36 @@ export const useGameStore = create<GameState>((set, get) => ({
       throw new Error(`Unknown game type: ${gameTypeSlug}`);
     }
 
-    const now = new Date();
-    const [game] = await db
-      .insert(games)
-      .values({
-        gameTypeId: gt.id,
-        targetScore,
-        createdAt: now,
-        updatedAt: now,
-        status: 'in_progress',
-      } satisfies NewGame)
-      .returning();
+    return runInTransaction(async () => {
+      const now = new Date();
+      const [game] = await db
+        .insert(games)
+        .values({
+          gameTypeId: gt.id,
+          targetScore,
+          createdAt: now,
+          updatedAt: now,
+          status: 'in_progress',
+        } satisfies NewGame)
+        .returning();
 
-    await db.insert(gamePlayers).values(
-      players.map(
-        (player, index) =>
-          ({
-            gameId: game.id,
-            displayName: player.displayName,
-            seatOrder: index,
-            color: player.color,
-            updatedAt: now,
-          }) satisfies NewGamePlayer,
-      ),
-    );
+      await db.insert(gamePlayers).values(
+        players.map(
+          (player, index) =>
+            ({
+              gameId: game.id,
+              displayName: player.displayName,
+              seatOrder: index,
+              color: player.color,
+              updatedAt: now,
+            }) satisfies NewGamePlayer,
+        ),
+      );
 
-    await get().loadGames();
-    return game.id;
+      await enqueue('games', game.id, 'insert', null);
+      await get().loadGames();
+      return game.id;
+    });
   },
 
   addRound: async ({ gameId, scores: scoreMap, closerId }) => {
@@ -162,80 +166,103 @@ export const useGameStore = create<GameState>((set, get) => ({
       throw new Error(`Game not found: ${gameId}`);
     }
 
-    const rules = getGameRules(joined.slug);
-    const existing = await db.select().from(rounds).where(eq(rounds.gameId, gameId));
-    const now = new Date();
+    return runInTransaction(async () => {
+      const rules = getGameRules(joined.slug);
+      const existing = await db.select().from(rounds).where(eq(rounds.gameId, gameId));
+      const now = new Date();
 
-    const [round] = await db
-      .insert(rounds)
-      .values({
-        gameId,
-        roundNumber: existing.length + 1,
-        createdAt: now,
+      const [round] = await db
+        .insert(rounds)
+        .values({
+          gameId,
+          roundNumber: existing.length + 1,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning();
+
+      const config = resolveGameConfig(joined, joined);
+      const result = rules.scoreRound({
+        scores: scoreMap,
+        closerId,
+        config,
+      });
+
+      const scoreRows = Object.entries(result.points).map(([playerId, points]) => ({
+        roundId: round.id,
+        gamePlayerId: Number(playerId),
+        points,
+        modifiers: result.modifiers[Number(playerId)] ?? null,
         updatedAt: now,
-      })
-      .returning();
+      }));
+      await db.insert(scores).values(scoreRows);
 
-    const config = resolveGameConfig(joined, joined);
-    const result = rules.scoreRound({
-      scores: scoreMap,
-      closerId,
-      config,
+      await recomputeAndSettle(gameId);
+
+      const insertedScores = await db
+        .select({ id: scores.id })
+        .from(scores)
+        .where(eq(scores.roundId, round.id));
+      for (const score of insertedScores) {
+        await enqueue('scores', score.id, 'insert', null);
+      }
+      await enqueue('rounds', round.id, 'insert', null);
+      await enqueue('games', gameId, 'update', null);
+
+      await get().loadGames();
     });
-
-    const scoreRows = Object.entries(result.points).map(([playerId, points]) => ({
-      roundId: round.id,
-      gamePlayerId: Number(playerId),
-      points,
-      modifiers: result.modifiers[Number(playerId)] ?? null,
-      updatedAt: now,
-    }));
-    await db.insert(scores).values(scoreRows);
-
-    await recomputeAndSettle(gameId);
-    await get().loadGames();
   },
 
   deleteLastRound: async (gameId) => {
-    const allRounds = await db
-      .select()
-      .from(rounds)
-      .where(eq(rounds.gameId, gameId))
-      .orderBy(desc(rounds.roundNumber));
+    await runInTransaction(async () => {
+      const allRounds = await db
+        .select()
+        .from(rounds)
+        .where(eq(rounds.gameId, gameId))
+        .orderBy(desc(rounds.roundNumber));
 
-    if (allRounds.length === 0) {
-      return;
-    }
+      if (allRounds.length === 0) {
+        return;
+      }
 
-    const lastRound = allRounds[0];
-    await db.delete(scores).where(eq(scores.roundId, lastRound.id));
-    await db.delete(rounds).where(eq(rounds.id, lastRound.id));
-    await db.update(games).set({ updatedAt: new Date() }).where(eq(games.id, gameId));
-    await get().loadGames();
+      const lastRound = allRounds[0];
+      await db.delete(scores).where(eq(scores.roundId, lastRound.id));
+      await db.delete(rounds).where(eq(rounds.id, lastRound.id));
+      await db.update(games).set({ updatedAt: new Date() }).where(eq(games.id, gameId));
+      await enqueue('games', gameId, 'update', null);
+      await get().loadGames();
+    });
   },
 
   updateScore: async (scoreId, points) => {
-    await db.update(scores).set({ points, updatedAt: new Date() }).where(eq(scores.id, scoreId));
+    await runInTransaction(async () => {
+      await db.update(scores).set({ points, updatedAt: new Date() }).where(eq(scores.id, scoreId));
+      await enqueue('scores', scoreId, 'update', null);
 
-    const [scoreRow] = await db
-      .select({ gameId: rounds.gameId })
-      .from(scores)
-      .innerJoin(rounds, eq(scores.roundId, rounds.id))
-      .where(eq(scores.id, scoreId));
+      const [scoreRow] = await db
+        .select({ gameId: rounds.gameId })
+        .from(scores)
+        .innerJoin(rounds, eq(scores.roundId, rounds.id))
+        .where(eq(scores.id, scoreId));
 
-    if (scoreRow) {
-      await recomputeAndSettle(scoreRow.gameId);
-    }
+      if (scoreRow) {
+        await recomputeAndSettle(scoreRow.gameId);
+        await enqueue('games', scoreRow.gameId, 'update', null);
+      }
 
-    await get().loadGames();
+      await get().loadGames();
+    });
   },
 
   finishGame: async (gameId) => {
-    const now = new Date();
-    await db
-      .update(games)
-      .set({ status: 'completed', endedAt: now, updatedAt: now })
-      .where(eq(games.id, gameId));
-    await get().loadGames();
+    await runInTransaction(async () => {
+      const now = new Date();
+      await db
+        .update(games)
+        .set({ status: 'completed', endedAt: now, updatedAt: now })
+        .where(eq(games.id, gameId));
+      await enqueue('games', gameId, 'update', null);
+      await get().loadGames();
+    });
   },
 }));

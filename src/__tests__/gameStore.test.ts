@@ -229,6 +229,7 @@ jest.mock('@/db/client', () => ({
     return mockDb;
   },
   initDB: jest.fn().mockResolvedValue(undefined),
+  runInTransaction: jest.fn((callback: () => Promise<unknown>) => callback()),
 }));
 
 // Schema proxies: any property access returns a ColRef { __col, __table }.
@@ -299,6 +300,18 @@ jest.mock('drizzle-orm', () => ({
       mockReadField(flatRow, left) === mockReadField(flatRow, right),
   ),
   desc: jest.fn((col: unknown) => col),
+}));
+
+jest.mock('@/sync/offlineQueue', () => ({
+  enqueue: jest.fn().mockResolvedValue(undefined),
+  getPendingOperations: jest.fn().mockResolvedValue([]),
+  removeFromQueue: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('@/sync/syncPayload', () => ({
+  buildPayload: jest.fn().mockResolvedValue({}),
+  buildPayloadWithCloudId: jest.fn().mockResolvedValue({}),
+  buildDeletePayload: jest.fn().mockResolvedValue({}),
 }));
 
 jest.mock('zustand', () => ({

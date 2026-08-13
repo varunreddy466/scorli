@@ -5,6 +5,14 @@ import * as schema from './schema';
 const expo = SQLite.openDatabaseSync('scorli.db');
 export const db = drizzle(expo, { schema });
 
+export async function runInTransaction<T>(callback: () => Promise<T>): Promise<T> {
+  let result: T | undefined;
+  await expo.withTransactionAsync(async () => {
+    result = await callback();
+  });
+  return result as T;
+}
+
 type TableColumn = {
   name: string;
 };
