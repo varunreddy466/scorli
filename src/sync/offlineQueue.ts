@@ -1,4 +1,4 @@
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { db } from '@/db/client';
 import { syncQueue } from '@/db/schema';
 
@@ -15,6 +15,17 @@ export async function enqueue(
     payload,
     createdAt: new Date(),
   });
+}
+
+export async function getPendingOperationCount(
+  tableName: string,
+  localId: number,
+): Promise<number> {
+  const rows = await db
+    .select({ id: syncQueue.id })
+    .from(syncQueue)
+    .where(and(eq(syncQueue.tableName, tableName), eq(syncQueue.localId, localId)));
+  return rows.length;
 }
 
 export async function getPendingOperations() {
