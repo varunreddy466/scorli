@@ -58,7 +58,7 @@ create table public.scores (
   id uuid primary key default gen_random_uuid(),
   round_id uuid not null references public.rounds on delete cascade,
   game_player_id uuid not null references public.game_players on delete cascade,
-  points numeric not null,
+  points double precision not null,
   modifiers jsonb,
   updated_at timestamptz default now() not null,
   deleted_at timestamptz
