@@ -153,7 +153,7 @@ describe('runSync — error path', () => {
 
     await runSync();
 
-    expect(mockEq).toHaveBeenCalledWith('remote-id');
+    expect(mockEq).toHaveBeenCalledWith('id', 'remote-id');
     expect(mockRemoveFromQueue).toHaveBeenCalledWith(5);
     expect(getSyncStatus()).toBe('idle');
   });
