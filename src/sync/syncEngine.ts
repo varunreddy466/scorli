@@ -21,7 +21,7 @@ let currentStatus: SyncStatus = 'idle';
 export const UPLOAD_ORDER: SyncTableName[] = ['games', 'game_players', 'rounds', 'scores'];
 
 function getDeleteCloudId(payload: Record<string, unknown> | null): string | null {
-  const cloudId = payload?.cloudId;
+  const cloudId = payload?.id;
   return typeof cloudId === 'string' && cloudId.length > 0 ? cloudId : null;
 }
 
