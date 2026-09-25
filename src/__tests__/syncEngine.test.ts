@@ -40,6 +40,7 @@ jest.mock('@react-native-community/netinfo', () => ({
 
 const mockRemoveFromQueue = jest.fn().mockResolvedValue(undefined);
 const mockGetPendingOperations = jest.fn();
+const mockSetCloudId = jest.fn().mockResolvedValue(undefined);
 
 jest.mock('@/sync/offlineQueue', () => ({
   getPendingOperations: (...args: unknown[]) => mockGetPendingOperations(...args),
@@ -49,13 +50,13 @@ jest.mock('@/sync/offlineQueue', () => ({
 jest.mock('@/sync/syncPayload', () => ({
   buildPayloadWithCloudId: jest.fn(async (_table: string, _localId: number) => ({})),
   buildDeletePayload: jest.fn(async (_table: string, _localId: number) => ({
-    cloudId: 'remote-id',
+    id: 'remote-id',
   })),
   hasCloudId: jest.fn(() => false),
 }));
 
 jest.mock('@/sync/cloudMapping', () => ({
-  setCloudId: jest.fn().mockResolvedValue(undefined),
+  setCloudId: (...args: unknown[]) => mockSetCloudId(...args),
   setCloudFks: jest.fn().mockResolvedValue(undefined),
 }));
 
@@ -111,9 +112,26 @@ describe('runSync — error path', () => {
     expect(getSyncStatus()).toBe('idle');
   });
 
+  it('persists the returned cloud id after a successful upsert', async () => {
+    mockGetPendingOperations.mockResolvedValue([makeOp()]);
+    mockFrom.mockReturnValue({
+      upsert: mockUpsert,
+    });
+    mockUpsert.mockReturnValue({
+      select: jest.fn().mockResolvedValue({
+        error: null,
+        data: [{ id: 'remote-id' }],
+      }),
+    });
+
+    await runSync();
+
+    expect(mockSetCloudId).toHaveBeenCalledWith('games', 42, 'remote-id');
+  });
+
   it('sets error status and does not dequeue when soft-delete update fails', async () => {
     mockGetPendingOperations.mockResolvedValue([
-      makeOp({ operation: 'delete', payload: { cloudId: 'remote-id' } }),
+      makeOp({ operation: 'delete', payload: { id: 'remote-id' } }),
     ]);
     mockEq.mockResolvedValue({ error: { message: 'fail' } });
     mockUpdate.mockReturnValue({ eq: mockEq });
@@ -127,7 +145,7 @@ describe('runSync — error path', () => {
 
   it('removes successful soft-delete op from queue', async () => {
     mockGetPendingOperations.mockResolvedValue([
-      makeOp({ id: 5, operation: 'delete', payload: { cloudId: 'remote-id' } }),
+      makeOp({ id: 5, operation: 'delete', payload: { id: 'remote-id' } }),
     ]);
     mockEq.mockResolvedValue({ error: null });
     mockUpdate.mockReturnValue({ eq: mockEq });
@@ -135,6 +153,7 @@ describe('runSync — error path', () => {
 
     await runSync();
 
+    expect(mockEq).toHaveBeenCalledWith('remote-id');
     expect(mockRemoveFromQueue).toHaveBeenCalledWith(5);
     expect(getSyncStatus()).toBe('idle');
   });
